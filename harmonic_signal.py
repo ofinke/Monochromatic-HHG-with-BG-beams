@@ -28,13 +28,14 @@ import mynumerics as mn
 from scipy.signal import square
 import IR_refractive_index as ir
 import XUV_refractive_index as xuv
+import units
 
-patm = 1.01325 # atmospheric pressure [bar]
+p_ref = 1. # reference pressure for scaling [bar]
 epsilonZero = 8.854187817e-12 #[F/m]
-electronCharge = 1.60217662e-19 #[C] 
-electronMass = 9.10938356e-31 #[kg]
-speedLight = 299792458 #[m/s]
-numberDensity = 2.6867774e25 #[m^-3] amount of particles of ideal gas in m^3, 1 atm and 20°C
+electronCharge = units.elcharge #[C] 
+electronMass = units.elmass #[kg]
+speedLight = units.c_light #[m/s]
+numberDensity = 1e5/(units.Boltzmann_constant*(273.15+20.)) # [m^-3] amount of particles of ideal gas in m^3, 1 mbar and 20°C
 
 # plasma frequency
 def plasma(wavelength, eta):
@@ -73,13 +74,15 @@ def hhg_k(pressure, gas, wavelength, eta, parameters):
     gas_table_dis = gas_type+'_'+XUV_table_type_dispersion
     gas_table_abs = gas_type+'_'+XUV_table_type_absorption
 
-    susNe = xuv.susc_atm(mn.ConvertPhoton(wavelength,'lambdaSI','omegaSI'), gas_table_dis)
-    absor = xuv.beta_factor_atm(mn.ConvertPhoton(wavelength,'lambdaSI','omegaSI'), gas_table_abs)*1j*2
-    # absor = abscl.absorption_xuv(wavelength)
+    susNe = xuv.susc_ref(mn.ConvertPhoton(wavelength,'lambdaSI','omegaSI'), gas_table_dis)
+    absor = xuv.beta_factor_ref(mn.ConvertPhoton(wavelength,'lambdaSI','omegaSI'), gas_table_abs)*1j*2
 
     for i, val in enumerate(pressure):
         # k additions by medium:
-        add_med[i] = (2*np.pi)/(wavelength)*np.sqrt((val/patm)*((1-eta)*(susNe+absor))+1)
+        # with (1-eta)
+        # add_med[i] = (2*np.pi)/(wavelength)*np.sqrt((val/p_ref)*((1-eta)*(susNe+absor))+1)
+        # without
+        add_med[i] = (2*np.pi)/(wavelength)*np.sqrt((val/p_ref)*(susNe+absor)+1)
 
 
     return add_med
@@ -109,7 +112,8 @@ def ir_k(pressure, gas, wavelength, eta, geo):
     susPl = plasma(wavelength, eta)
 
     for i, val in enumerate(pressure):
-        add_med[i] = (2*np.pi)/(wavelength)*np.sqrt((val/patm)*(susPl+(1-eta)*(susNe))+1)
+        # add_med[i] = (2*np.pi)/(wavelength)*np.sqrt((val/p_ref)*(susPl+(1-eta)*(susNe))+1)
+        add_med[i] = (2*np.pi)/(wavelength)*np.sqrt((val/p_ref)*(susPl+(susNe))+1)
         add_gou[i] = geo; 
     
     return add_med - add_gou
@@ -198,8 +202,8 @@ def p_one(tbt, period, order):
     return tbt/(period*order)
 
 def p_two(tbt, period, wavelength, order, pressure, gas, ratio):
-    harm = (np.pi/wavelength)*((1/(2*ratio)*pressure)/patm*xuv.susc_atm(mn.ConvertPhoton(wavelength/order,'lambdaSI','omegaSI'), gas))
-    fund = (np.pi/wavelength)*((1/(2*ratio)*pressure)/patm*ir.getsusc(gas, wavelength))
+    harm = (np.pi/wavelength)*((1/(2*ratio)*pressure)/p_ref*xuv.susc_ref(mn.ConvertPhoton(wavelength/order,'lambdaSI','omegaSI'), gas))
+    fund = (np.pi/wavelength)*((1/(2*ratio)*pressure)/p_ref*ir.getsusc(gas, wavelength))
     return p_one(tbt, period, order) - harm + fund
 
 def fullmodel(tbt, period, wavelength, order, pressure, gas, eta, parameters):
@@ -225,7 +229,12 @@ def fullmodel(tbt, period, wavelength, order, pressure, gas, eta, parameters):
     XUV_table_type_dispersion = parameters['XUV_table_type_dispersion']
     gas_table = gas_type+'_'+XUV_table_type_dispersion
 
-    return p_one(tbt, period, order) + ((pressure)/(patm))*(np.pi/wavelength)*(plasma(wavelength, eta) - plasma(wavelength/order, eta) + (1-eta)*(ir.getsusc(gas, wavelength)-xuv.susc_atm(mn.ConvertPhoton(wavelength/order,'lambdaSI','omegaSI'), gas_table)))
+    # with (1-eta)
+    # res = p_one(tbt, period, order) + ((pressure)/(p_ref))*(np.pi/wavelength)*(plasma(wavelength, eta) - plasma(wavelength/order, eta) + (1-eta)*(ir.getsusc(gas, wavelength)-xuv.susc_ref(mn.ConvertPhoton(wavelength/order,'lambdaSI','omegaSI'), gas_table)))
+    # without
+    res = p_one(tbt, period, order) + ((pressure)/(p_ref))*(np.pi/wavelength)*(plasma(wavelength, eta) - plasma(wavelength/order, eta) + (ir.getsusc(gas, wavelength)-xuv.susc_ref(mn.ConvertPhoton(wavelength/order,'lambdaSI','omegaSI'), gas_table)))
+
+    return res
 
 # _____________________________________________________________________________________
 # PRESSURE MODULATION
@@ -295,6 +304,34 @@ def modstep2(pressure, period, z, ratio=0.5):
     Returns vector with step modulation, where medium has always same pressure [bar]
     """
     return 0.5*pressure*square((2*np.pi/period)*z, duty=ratio)+ 0.5*pressure
+
+def modgauss(centp, period, z, sigma):
+    """
+    returns vector with gauss train modulation
+
+    Parameters
+    ----------
+    pressure: average pressure in a medium [bar]
+    period: number-like [m] length of single period
+    z: array-like, z-axis for the modulation
+    sigma: sigma of gaussian pulse
+
+    Returns
+    -------
+    Returns vector with train of gaussian pulses, where medium has average pressure centp [bar]
+    """
+    n_pulses = int(np.ceil(z[-1] / period))  
+    train = np.zeros_like(z)  
+  
+    for i in range(n_pulses):  
+        pulse_centp = period * (i + 0.5)  
+        train += np.exp(-(z - pulse_centp)**2 / (2 * sigma**2))  
+  
+    # scale the result to ensure average pressure
+    scale_factor = centp/np.mean(train)
+    train = train * scale_factor
+
+    return train
 
 
 ## back compatibility, kept for instant

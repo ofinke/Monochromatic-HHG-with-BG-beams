@@ -28,9 +28,7 @@ import mynumerics as mn
 import XUV_refractive_index as XUV_index
 import IR_refractive_index as IR_index
 
-
-
-N_atm = XUV_index.N_atm_default # gas number density (atmospheric pressure)
+N_ref = XUV_index.N_ref_default # reference gas number density (p = 1 bar & T = 20 °C)
 
 def Phi_2pi_decider(Phi, tol = 8.*np.finfo(float).eps):
     """
@@ -93,13 +91,13 @@ def single_period_S1(pressure, zeta, ionisation_ratio, l1, Horder, parameters, i
     polarisability_IR = IR_index.polarisability(gas_type, mn.ConvertPhoton(omegaSI,'omegaSI','lambdaSI'))
     polarisability_XUV = XUV_index.polarisability(Horder*omegaSI, gas_type+'_'+XUV_table_type_dispersion)    
     
-    delta_k1 = Horder * k0 * (0.5*pressure*N_atm*( (polarisability_IR - polarisability_XUV) - ionisation_ratio*plasma_constant) - zeta )
+    delta_k1 = Horder * k0 * (0.5*pressure*N_ref*( (polarisability_IR - polarisability_XUV) - ionisation_ratio*plasma_constant) - zeta )
     L_coh = np.abs(np.pi/delta_k1) 
        
     # add absorption
     if include_absorption:
-        beta_factor_atm = XUV_index.beta_factor_atm(Horder*omegaSI, gas_type + '_' + XUV_table_type_absorption)
-        delta_k1 = delta_k1 + 1j*Horder*k0 * pressure * beta_factor_atm
+        beta_factor_ref = XUV_index.beta_factor_ref(Horder*omegaSI, gas_type + '_' + XUV_table_type_absorption)
+        delta_k1 = delta_k1 + 1j*Horder*k0 * pressure * beta_factor_ref
     
     ## Here we compute the generated field after the distance l1, it is given by
     #         Aq* 1j * (np.exp(1j * delta_k1 * l1)-1.0) / delta_k1)
@@ -174,14 +172,14 @@ def compute_Phi(pressure, zeta, l1, xi, ionisation_ratio, Horder, parameters, in
  
     
     Phi = Horder*l1*k0*(
-                    0.5*pressure*N_atm*( (polarisability_IR - polarisability_XUV) - ionisation_ratio*plasma_constant) -
+                    0.5*pressure*N_ref*( (polarisability_IR - polarisability_XUV) - ionisation_ratio*plasma_constant) -
                     zeta * (1.0 + xi)
                     )
     
     # add absorption
     if include_absorption:
-        beta_factor_atm = XUV_index.beta_factor_atm(Horder*omegaSI, gas_type + '_' + XUV_table_type_absorption)
-        Phi = Phi + 1j*Horder*l1*k0 * pressure * beta_factor_atm
+        beta_factor_ref = XUV_index.beta_factor_ref(Horder*omegaSI, gas_type + '_' + XUV_table_type_absorption)
+        Phi = Phi + 1j*Horder*l1*k0 * pressure * beta_factor_ref
     
     
     return Phi
@@ -404,7 +402,7 @@ def zeta_single_segment_pm(pressure, Horder, ionisation_ratio, parameters):
     delta_polarisability = IR_index.polarisability(gas_type, mn.ConvertPhoton(omegaSI,'omegaSI','lambdaSI')) - \
                            XUV_index.polarisability(Horder*omegaSI, gas_type+'_'+XUV_table_type_dispersion)   
 
-    zeta =  0.5 * pressure * N_atm * ( delta_polarisability - ionisation_ratio*plasma_constant) 
+    zeta =  0.5 * pressure * N_ref * ( delta_polarisability - ionisation_ratio*plasma_constant) 
     
     return zeta
 
@@ -413,7 +411,7 @@ def xi_chain_pm(delta_phi, pressure, l1, zeta, ionisation_ratio, Horder, paramet
     """
     Compute the stride characterised by 'xi' to ensure the phase jump by
     'delta_phi' within one elementary segment. The optimal value to select
-    'Horder' is delta_phi = pi/(Horder*n); n = -1, -2, -3, ...
+    'Horder' is delta_phi = pi/(Horder*n); n = 1, 2, 3, ...
 
     Parameters
     ----------
@@ -442,7 +440,7 @@ def xi_chain_pm(delta_phi, pressure, l1, zeta, ionisation_ratio, Horder, paramet
     k0 = omegaSI /units.c_light
     
     
-    xi = (1/zeta) * (0.5 * pressure * N_atm * (delta_polarisability - ionisation_ratio*plasma_constant) -
+    xi = (1/zeta) * (0.5 * pressure * N_ref * (delta_polarisability - ionisation_ratio*plasma_constant) +
                      2.0 * delta_phi / (k0*l1)
                      ) - 1.0
     
@@ -453,7 +451,7 @@ def zeta_chain_pm(delta_phi, pressure, l1, xi, ionisation_ratio, Horder, paramet
     """
     Compute the geometrical phase 'zeta' to ensure the phase jump by
     'delta_phi' within one elementary segment. The optimal value to select
-    'Horder' is delta_phi = pi/(Horder*n); n = -1, -2, -3, ...
+    'Horder' is delta_phi = pi/(Horder*n); n = 1, 2, 3, ...
 
     Parameters
     ----------
@@ -480,7 +478,7 @@ def zeta_chain_pm(delta_phi, pressure, l1, xi, ionisation_ratio, Horder, paramet
     polarisability_XUV = XUV_index.polarisability(Horder*omegaSI, gas_type+'_'+XUV_table_type_dispersion) 
 
     zeta = (1.0/(1.0+xi)) * (
-            0.5 * pressure * N_atm * ( (polarisability_IR - polarisability_XUV) - ionisation_ratio*plasma_constant) -
+            0.5 * pressure * N_ref * ( (polarisability_IR - polarisability_XUV) - ionisation_ratio*plasma_constant) +
             2.0 * delta_phi/ (k0*l1))
     
     return zeta
