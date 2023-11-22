@@ -2,8 +2,8 @@
 This repository represent supplementary code for the article "Monochromatic high-harmonic generation by Bessel-Gauss beam in periodically modulated media"
 
 ### Jupyter notebooks
-Presented notebooks consist of several example experimental cases:
-- Optimised target for H41 in argon with 1030 nm driver for different cases of ionization ($\eta$) and medium defined as gas jets with gaussian pressure profile.
+Presented notebooks consist of several example experimental cases with binary medium:
+- Optimised target for H41 in argon with 1030 nm driver for different cases of ionization ($\eta$) and medium defined as gas jets with gaussian pressure profile ```optimise_Ar_1030nm_H41_Gaussian.ipynb.py```.
 - Optimised target for H23 in argon with 800 nm driver
 - Optimised target for H401 in helium with 1600 nm driver
 
