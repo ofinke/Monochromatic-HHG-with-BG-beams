@@ -1,5 +1,5 @@
 # **Monochromatic HHG with BG beams**
-This repository represent supplementary code for the article "Monochromatic high-harmonic generation by Bessel-Gauss beam in periodically modulated media"
+This repository represent supplementary code for the article [Monochromatic high-harmonic generation by Bessel-Gauss beam in periodically modulated media](https://journals.aps.org/pra/abstract/10.1103/PhysRevA.109.033517)
 
 ### Jupyter notebooks
 Presented notebooks consist of several example experimental cases with binary medium:
